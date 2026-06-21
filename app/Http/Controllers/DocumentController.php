@@ -108,6 +108,9 @@ class DocumentController extends Controller
             'pdf_template' => 'nullable|string|max:50',
         ]);
 
+        if (isset($validated['notes'])) {
+            $validated['notes'] = trim(preg_replace('/___FEES___\[.*?\]/s', '', $validated['notes']));
+        }
         $validated['user_id'] = $request->user()->id;
         $validated['company_id'] = $company->id;
 
@@ -179,6 +182,9 @@ class DocumentController extends Controller
             'pdf_template' => 'nullable|string|max:50',
         ]);
 
+        if (isset($validated['notes'])) {
+            $validated['notes'] = trim(preg_replace('/___FEES___\[.*?\]/s', '', $validated['notes']));
+        }
         $document->update($validated);
 
         return response()->json($document->load('client:id,name', 'items'));

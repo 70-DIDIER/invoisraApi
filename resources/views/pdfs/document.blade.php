@@ -25,10 +25,15 @@
         .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; color: #999; padding: 10px 0; border-top: 1px solid #eee; }
         .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
         .signatures img { max-height: 60px; }
-
     </style>
 </head>
 <body>
+    @php
+        $regularItems = $document->items->filter(fn($item) => !str_starts_with($item->designation, 'FEE:'));
+        $feeItems = $document->items->filter(fn($item) => str_starts_with($item->designation, 'FEE:'));
+        $cleanNotes = trim(preg_replace('/___FEES___\[.*?\]/s', '', $document->notes ?? ''));
+        $displaySubtotal = $document->subtotal ?: $regularItems->sum('total_price');
+    @endphp
     <div class="header">
         @if ($document->company->logo)
             <img src="{{ public_path('storage/' . str_replace('/storage/', '', $document->company->logo)) }}" alt="Logo" class="header-logo">
@@ -75,7 +80,7 @@
             </tr>
         </thead>
         <tbody>
-            @foreach ($document->items as $item)
+            @foreach ($regularItems as $item)
                 <tr>
                     <td>{{ $item->designation }}</td>
                     <td>{{ $item->quantity }}</td>
@@ -87,15 +92,24 @@
     </table>
 
     <table class="totals">
-        <tr><td>Sous-total</td><td>{{ number_format($document->subtotal ?: $document->items->sum('total_price'), 0, ',', ' ') }} FCFA</td></tr>
-        @if ($document->labor_cost > 0)
-            <tr><td>Main-d'œuvre</td><td>{{ number_format($document->labor_cost, 0, ',', ' ') }} FCFA</td></tr>
-        @endif
-        @if ($document->transport_cost > 0)
-            <tr><td>Transport</td><td>{{ number_format($document->transport_cost, 0, ',', ' ') }} FCFA</td></tr>
-        @endif
-        @if ($document->other_cost > 0)
-            <tr><td>Autres frais</td><td>{{ number_format($document->other_cost, 0, ',', ' ') }} FCFA</td></tr>
+        <tr><td>Sous-total</td><td>{{ number_format($displaySubtotal, 0, ',', ' ') }} FCFA</td></tr>
+        @if ($feeItems->isNotEmpty())
+            @foreach ($feeItems as $fee)
+                <tr>
+                    <td>{{ str_replace('FEE:', '', $fee->designation) }}</td>
+                    <td>{{ number_format($fee->total_price, 0, ',', ' ') }} FCFA</td>
+                </tr>
+            @endforeach
+        @else
+            @if ($document->labor_cost > 0)
+                <tr><td>Main-d'œuvre</td><td>{{ number_format($document->labor_cost, 0, ',', ' ') }} FCFA</td></tr>
+            @endif
+            @if ($document->transport_cost > 0)
+                <tr><td>Transport</td><td>{{ number_format($document->transport_cost, 0, ',', ' ') }} FCFA</td></tr>
+            @endif
+            @if ($document->other_cost > 0)
+                <tr><td>Autres frais</td><td>{{ number_format($document->other_cost, 0, ',', ' ') }} FCFA</td></tr>
+            @endif
         @endif
         <tr class="grand-total">
             <td><strong>TOTAL</strong></td>
@@ -107,10 +121,10 @@
         <p><em>Arrêté la présente {{ $document->type === 'invoice' ? 'facture' : 'devis' }} à la somme de {{ $document->total_in_words }}.</em></p>
     @endif
 
-    @if ($document->notes)
+    @if ($cleanNotes)
         <div class="notes">
             <strong>Notes :</strong><br>
-            {{ nl2br($document->notes) }}
+            {{ nl2br($cleanNotes) }}
         </div>
     @endif
 
