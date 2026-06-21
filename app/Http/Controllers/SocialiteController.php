@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -51,12 +52,16 @@ class SocialiteController extends Controller
         ]),
     )]
     #[OA\Response(response: 401, description: 'Authentification Google échouée')]
-    public function callback(Request $request): JsonResponse
+    public function callback(Request $request): JsonResponse|RedirectResponse
     {
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
         } catch (\Exception) {
-            return response()->json(['message' => 'Authentification Google échouée.'], 401);
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Authentification Google échouée.'], 401);
+            }
+            $errorUrl = config('app.url') . '/auth/google/error';
+            return redirect($errorUrl);
         }
 
         $user = User::where('google_id', $googleUser->getId())->first();
@@ -86,9 +91,18 @@ class SocialiteController extends Controller
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        return response()->json([
-            'user' => $user,
+        if ($request->expectsJson()) {
+            return response()->json([
+                'user' => $user,
+                'token' => $token,
+            ]);
+        }
+
+        $redirectUrl = 'invoica://auth/callback?' . http_build_query([
             'token' => $token,
+            'user' => json_encode($user->only(['id', 'name', 'email'])),
         ]);
+
+        return redirect($redirectUrl);
     }
 }

@@ -5,41 +5,46 @@
     <title>{{ $document->type === 'invoice' ? 'FACTURE' : 'DEVIS' }} {{ $document->number }}</title>
     <style>
         body { font-family: 'Helvetica', sans-serif; font-size: 12px; line-height: 1.4; color: #333; }
-        .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
-        .company-info { text-align: right; }
-        .company-logo { max-height: 80px; }
-        .title { text-align: center; font-size: 22px; font-weight: bold; margin: 20px 0; text-transform: uppercase; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header-logo { max-height: 70px; margin-bottom: 8px; }
+        .company-name { font-size: 16px; font-weight: bold; color: #0E7D36; margin-bottom: 4px; }
+        .company-details { font-size: 11px; color: #555; line-height: 1.6; }
+        .title { text-align: center; font-size: 22px; font-weight: bold; margin: 20px 0; text-transform: uppercase; color: #0E7D36; }
         .info-table { width: 100%; margin-bottom: 20px; }
         .info-table td { padding: 4px 8px; }
         .info-table td:first-child { font-weight: bold; width: 120px; }
         table.items { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        table.items th { background: #f5f5f5; padding: 8px; text-align: left; font-weight: bold; }
+        table.items th { background: #0E7D36; color: #fff; padding: 8px; text-align: left; font-weight: bold; font-size: 11px; }
         table.items td { padding: 8px; border-bottom: 1px solid #eee; }
         table.items td:last-child, table.items th:last-child { text-align: right; }
         .totals { margin-left: auto; width: 300px; }
         .totals td { padding: 4px 8px; }
         .totals .grand-total { font-size: 16px; font-weight: bold; }
-        .notes { margin-top: 30px; padding: 10px; background: #f9f9f9; border-left: 3px solid #ccc; }
+        .totals .grand-total td { border-top: 2px solid #0E7D36; padding-top: 8px; }
+        .notes { margin-top: 30px; padding: 10px; background: #f9f9f9; border-left: 3px solid #0E7D36; }
         .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; color: #999; padding: 10px 0; border-top: 1px solid #eee; }
         .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
         .signatures img { max-height: 60px; }
+
     </style>
 </head>
 <body>
     <div class="header">
-        <div>
-            @if ($document->company->logo)
-                <img src="{{ public_path('storage/' . str_replace('/storage/', '', $document->company->logo)) }}" alt="Logo" class="company-logo">
-            @endif
-        </div>
-        <div class="company-info">
-            <strong>{{ $document->company->name }}</strong><br>
+        @if ($document->company->logo)
+            <img src="{{ public_path('storage/' . str_replace('/storage/', '', $document->company->logo)) }}" alt="Logo" class="header-logo">
+        @else
+            <img src="{{ public_path('images/logo.png') }}" alt="Invoiça" class="header-logo">
+        @endif
+        <div class="company-name">{{ $document->company->name }}</div>
+        <div class="company-details">
             {{ $document->company->address }}<br>
-            Tél: {{ $document->company->phone }}<br>
+            Tél: {{ $document->company->phone }}
             @if ($document->company->email)
-                {{ $document->company->email }}<br>
+                | {{ $document->company->email }}
             @endif
-            Gérant: {{ $document->company->manager_name }}
+            @if ($document->company->manager_name)
+                <br>Gérant: {{ $document->company->manager_name }}
+            @endif
         </div>
     </div>
 
@@ -66,7 +71,7 @@
                 <th>Désignation</th>
                 <th>Quantité</th>
                 <th>Prix unitaire</th>
-                <th>Total HT</th>
+                <th>Montant</th>
             </tr>
         </thead>
         <tbody>
@@ -74,27 +79,27 @@
                 <tr>
                     <td>{{ $item->designation }}</td>
                     <td>{{ $item->quantity }}</td>
-                    <td>{{ number_format($item->unit_price, 2, ',', ' ') }} €</td>
-                    <td>{{ number_format($item->total_price, 2, ',', ' ') }} €</td>
+                    <td>{{ number_format($item->unit_price, 0, ',', ' ') }} FCFA</td>
+                    <td>{{ number_format($item->total_price, 0, ',', ' ') }} FCFA</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
 
     <table class="totals">
-        <tr><td>Sous-total</td><td>{{ number_format($document->subtotal ?: $document->items->sum('total_price'), 2, ',', ' ') }} €</td></tr>
+        <tr><td>Sous-total</td><td>{{ number_format($document->subtotal ?: $document->items->sum('total_price'), 0, ',', ' ') }} FCFA</td></tr>
         @if ($document->labor_cost > 0)
-            <tr><td>Main-d'œuvre</td><td>{{ number_format($document->labor_cost, 2, ',', ' ') }} €</td></tr>
+            <tr><td>Main-d'œuvre</td><td>{{ number_format($document->labor_cost, 0, ',', ' ') }} FCFA</td></tr>
         @endif
         @if ($document->transport_cost > 0)
-            <tr><td>Transport</td><td>{{ number_format($document->transport_cost, 2, ',', ' ') }} €</td></tr>
+            <tr><td>Transport</td><td>{{ number_format($document->transport_cost, 0, ',', ' ') }} FCFA</td></tr>
         @endif
         @if ($document->other_cost > 0)
-            <tr><td>Autres frais</td><td>{{ number_format($document->other_cost, 2, ',', ' ') }} €</td></tr>
+            <tr><td>Autres frais</td><td>{{ number_format($document->other_cost, 0, ',', ' ') }} FCFA</td></tr>
         @endif
         <tr class="grand-total">
-            <td><strong>TOTAL TTC</strong></td>
-            <td><strong>{{ number_format($document->total, 2, ',', ' ') }} €</strong></td>
+            <td><strong>TOTAL</strong></td>
+            <td><strong>{{ number_format($document->total, 0, ',', ' ') }} FCFA</strong></td>
         </tr>
     </table>
 
@@ -124,7 +129,8 @@
     </div>
 
     <div class="footer">
-        {{ $document->company->name }} - {{ $document->company->address }} - Tél: {{ $document->company->phone }}
+        {{ $document->company->name }} - {{ $document->company->address }} - Tél: {{ $document->company->phone }}<br>
+        <span style="color:#0E7D36;font-size:9px;font-weight:600;">Made by Invoiça</span>
     </div>
 </body>
 </html>

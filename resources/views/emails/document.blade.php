@@ -18,7 +18,7 @@
 
     <p>
         Projet : <strong>{{ $document->project_name }}</strong><br>
-        Montant total : <strong>{{ number_format($document->total, 2, ',', ' ') }} €</strong>
+        Montant total : <strong>{{ number_format($document->total, 0, ',', ' ') }} FCFA</strong>
     </p>
 
     <p>
