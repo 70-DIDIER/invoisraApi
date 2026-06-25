@@ -21,10 +21,14 @@
         .totals td { padding: 4px 8px; }
         .totals .grand-total { font-size: 16px; font-weight: bold; }
         .totals .grand-total td { border-top: 2px solid #0E7D36; padding-top: 8px; }
+        .total-in-words { margin-top: 12px; padding: 8px 12px; background: #f0f9f3; border-left: 3px solid #0E7D36; font-size: 11px; color: #333; line-height: 1.5; }
         .notes { margin-top: 30px; padding: 10px; background: #f9f9f9; border-left: 3px solid #0E7D36; }
         .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; color: #999; padding: 10px 0; border-top: 1px solid #eee; }
-        .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
-        .signatures img { max-height: 60px; }
+        .signatures { margin-top: 40px; width: 100%; border-collapse: collapse; }
+        .signatures td { width: 50%; vertical-align: bottom; padding: 0 8px; }
+        .signatures td:first-child { text-align: left; }
+        .signatures td:last-child { text-align: right; }
+        .signatures img { max-height: 70px; }
     </style>
 </head>
 <body>
@@ -33,23 +37,62 @@
         $feeItems = $document->items->filter(fn($item) => str_starts_with($item->designation, 'FEE:'));
         $cleanNotes = trim(preg_replace('/___FEES___\[.*?\]/s', '', $document->notes ?? ''));
         $displaySubtotal = $document->subtotal ?: $regularItems->sum('total_price');
+
+        $units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf',
+                  'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize',
+                  'dix-sept', 'dix-huit', 'dix-neuf'];
+        $tens = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante',
+                 'soixante-dix', 'quatre-vingt', 'quatre-vingt-dix'];
+
+        $below1000 = function(int $num) use ($units, $tens): string {
+            $parts = [];
+            $h = intdiv($num, 100);
+            $r = $num % 100;
+            if ($h === 1) $parts[] = 'cent';
+            elseif ($h > 1) $parts[] = $units[$h] . ' cent';
+            if ($r > 0) {
+                if ($r < 20) { $parts[] = $units[$r]; }
+                else {
+                    $d = intdiv($r, 10); $u = $r % 10;
+                    if ($d === 7 || $d === 9) $parts[] = $tens[$d] . ($u > 0 ? '-' . $units[10 + $u] : '');
+                    elseif ($u === 1 && $d > 1) $parts[] = $tens[$d] . ' et un';
+                    elseif ($u > 0) $parts[] = $tens[$d] . '-' . $units[$u];
+                    else $parts[] = ($d === 8) ? 'quatre-vingts' : $tens[$d];
+                }
+            }
+            return implode(' ', $parts);
+        };
+
+        $numberToWords = function(int $n) use ($below1000): string {
+            if ($n === 0) return 'zéro';
+            $parts = [];
+            $milliard = intdiv($n, 1000000000);
+            $million  = intdiv($n % 1000000000, 1000000);
+            $mille    = intdiv($n % 1000000, 1000);
+            $reste    = $n % 1000;
+            if ($milliard > 0) $parts[] = $below1000($milliard) . ($milliard > 1 ? ' milliards' : ' milliard');
+            if ($million  > 0) $parts[] = $below1000($million)  . ($million  > 1 ? ' millions'  : ' million');
+            if ($mille    > 0) $parts[] = $below1000($mille)    . ' mille';
+            if ($reste    > 0) $parts[] = $below1000($reste);
+            return implode(' ', $parts);
+        };
+
+        $totalEnLettres = ucfirst($numberToWords((int) $document->total));
+        $docTypeName = $document->type === 'invoice' ? 'facture' : 'devis';
     @endphp
     <div class="header">
-        @if ($document->company->logo)
-            <img src="{{ public_path('storage/' . str_replace('/storage/', '', $document->company->logo)) }}" alt="Logo" class="header-logo">
-        @else
-            <img src="{{ public_path('images/logo.png') }}" alt="Invoiça" class="header-logo">
+        @if ($document->company?->logo)
+            @php $logoPath = public_path('storage/' . str_replace('/storage/', '', $document->company->logo)); @endphp
+            @if (file_exists($logoPath))
+                <img src="{{ $logoPath }}" alt="Logo" class="header-logo">
+            @endif
         @endif
-        <div class="company-name">{{ $document->company->name }}</div>
+        <div class="company-name">{{ $document->company?->name ?? '' }}</div>
         <div class="company-details">
-            {{ $document->company->address }}<br>
-            Tél: {{ $document->company->phone }}
-            @if ($document->company->email)
-                | {{ $document->company->email }}
-            @endif
-            @if ($document->company->manager_name)
-                <br>Gérant: {{ $document->company->manager_name }}
-            @endif
+            {{ $document->company?->address }}<br>
+            @if ($document->company?->phone) Tél: {{ $document->company->phone }} @endif
+            @if ($document->company?->email) | {{ $document->company->email }} @endif
+            @if ($document->company?->manager_name) <br>Gérant: {{ $document->company->manager_name }} @endif
         </div>
     </div>
 
@@ -117,9 +160,9 @@
         </tr>
     </table>
 
-    @if ($document->total_in_words)
-        <p><em>Arrêté la présente {{ $document->type === 'invoice' ? 'facture' : 'devis' }} à la somme de {{ $document->total_in_words }}.</em></p>
-    @endif
+    <div class="total-in-words">
+        Arrêté le présent {{ $docTypeName }} à la somme de : <em>{{ $totalEnLettres }} francs CFA</em>.
+    </div>
 
     @if ($cleanNotes)
         <div class="notes">
@@ -128,22 +171,30 @@
         </div>
     @endif
 
-    <div class="signatures">
-        @if ($document->company->signature)
-            <div>
-                <strong>Signature du gérant</strong><br>
-                <img src="{{ public_path('storage/' . str_replace('/storage/', '', $document->company->signature)) }}" alt="Signature">
-            </div>
-        @endif
-        @if ($document->company->stamp)
-            <div>
-                <img src="{{ public_path('storage/' . str_replace('/storage/', '', $document->company->stamp)) }}" alt="Tampon">
-            </div>
-        @endif
-    </div>
+    <table class="signatures">
+        <tr>
+            <td>
+                @if ($document->company?->signature)
+                    @php $sigPath = public_path('storage/' . str_replace('/storage/', '', $document->company->signature)); @endphp
+                    @if (file_exists($sigPath))
+                        <strong>Signature du gérant</strong><br>
+                        <img src="{{ $sigPath }}" alt="Signature">
+                    @endif
+                @endif
+            </td>
+            <td>
+                @if ($document->company?->stamp)
+                    @php $stampPath = public_path('storage/' . str_replace('/storage/', '', $document->company->stamp)); @endphp
+                    @if (file_exists($stampPath))
+                        <img src="{{ $stampPath }}" alt="Tampon">
+                    @endif
+                @endif
+            </td>
+        </tr>
+    </table>
 
     <div class="footer">
-        {{ $document->company->name }} - {{ $document->company->address }} - Tél: {{ $document->company->phone }}<br>
+        {{ $document->company?->name }} - {{ $document->company?->address }} - Tél: {{ $document->company?->phone }}<br>
         <span style="color:#0E7D36;font-size:9px;font-weight:600;">Made by Invoiça</span>
     </div>
 </body>
